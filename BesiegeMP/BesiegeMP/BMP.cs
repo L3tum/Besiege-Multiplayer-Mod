@@ -1,22 +1,25 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using spaar.ModLoader;
+using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace BesiegeMP
 {
     public class BMP : Mod
     {
+        private GameObject myGO;
+
         public override void OnLoad()
         {
-            throw new NotImplementedException();
+            myGO = new GameObject("Multiplayer");
+            Settings.Load();
+            myGO.AddComponent<GeneralGUI>();
         }
 
         public override void OnUnload()
         {
-            throw new NotImplementedException();
+            Settings.Save();
+            Object.Destroy(myGO);
         }
 
         public override string Name => "BesiegeMultiplayerMod";

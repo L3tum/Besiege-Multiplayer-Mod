@@ -1,0 +1,34 @@
+﻿body
+{
+-Connection IDs: Die Connection zwischen zwei Sockets(egal ob Server-Client oder Client-Client, in diesem Programm jedoch nur Server-Client möglich). Wenn etwas über diese Connection gesendet wird, muss es immer einer der beiden sein, zu denen diese Connection assoziiert ist, 
+				und die Message wird zu dem jeweils anderen gesendet.
+
+-Channel IDs: Der Channel. Es gibt mehrere Channel bei jeder Connection
+
+-User Klasse: Die Klasse eines connected Spieler. Wenn der Server ein Dedicated Server ist, bekommt er keine "User" Klasse, sondern eine "Spectator" Klasse
+
+-MiscChannel: Bisher benutzt, um den Namen an den Server zu senden, sobald man verbunden ist. Muss IMMER ein String sein.
+
+-NetworkTransport.AddHost: Startet einen Socket, über den Verbindungen mit anderen Spielern eingegangen werden kann. Server, Client und Dedicated Server müssen alle zuerst einen Socket haben. Blöder Name.
+}
+Server
+{
+-MiscChannel empfängt etwas: Guckt ob es mit "Name:" anfängt, wenn ja, fügt es den Spieler zu "Users" hinzu und sendet seine Klasse an die anderen Clients, sowie dem Spieler, über die "UserConnection".
+
+-UserChannel: Wird nur für die Versendung von User-Klassen benutzt. Dies geschieht eigentlich nur von Server zu Client, sobald sich ein neuer Client connected.
+}
+
+
+-User kann timestep für Update auswählen
+-Update in separatem thread
+-Sync in separatem thread
+-Server kann timestep für sync auswählen
+-Die Nummer des Steps wird mitgesendet
+-Ankündigung eines syncs für den nächsten Sync step sowie Update-Step für den User(Mathematik..eine Menge wird gebraucht....sowas von kein Bock)
+-Loader mod der alles andere runterlädt(vielleicht, ist eigentlich bisher noch nicht gebraucht)
+-voice chat
+-Spectator
+-Spectator enabling
+-shorts instead of ints
+-Client to client communication settings
+-Server list
