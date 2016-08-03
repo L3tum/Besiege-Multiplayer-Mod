@@ -1,4 +1,6 @@
 ﻿using System;
+using System.Threading;
+using System.Threading.Tasks;
 using spaar.ModLoader;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -12,14 +14,14 @@ namespace BesiegeMP
         public override void OnLoad()
         {
             myGO = new GameObject("Multiplayer");
-            Settings.Load();
+            Task.Factory.StartNew(Settings.Load);
             myGO.AddComponent<GeneralGUI>();
         }
 
         public override void OnUnload()
         {
-            Settings.Save();
             Object.Destroy(myGO);
+            Settings.Save();
         }
 
         public override string Name => "BesiegeMultiplayerMod";

@@ -1,171 +1,113 @@
-﻿#region usings
+#region usings
 
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
 using System.Text;
 using System.Text.RegularExpressions;
-using JetBrains.Annotations;
+using System.Threading;
+using BesiegeMP.VoiceChat.Scripts;
 using spaar.ModLoader;
 using spaar.ModLoader.UI;
 using UnityEngine;
 using UnityEngine.Networking;
-using UnityEngine.Networking.Match;
+using VoiceChat;
 
 #endregion
 
-namespace BesiegeMP
+namespace BesiegeMP.Network
 {
     internal class Network : MonoBehaviour
     {
         private readonly int _winId = spaar.ModLoader.Util.GetWindowID();
         private string message = "";
-        private readonly List<string> messages = new List<string>();
-        private int miscChannelId, userChannelId, chatChannelId, importantChannelId, blockChannelId, methodChannelId, socketID, connectionId, sPort;
+        public readonly List<string> messages = new List<string>();
         private Vector2 pos;
         private string sAdress;
         private readonly Key show = Keybindings.AddKeybinding("Chat", new Key(KeyCode.LeftControl, KeyCode.Q));
         private bool showWin, stylesDone, isServer;
         private Texture2D text;
-        private HostTopology topology;
-        private readonly Dictionary<string, User> Users = new Dictionary<string, User>();
-        private readonly Dictionary<String, responseDelegate> responses = new Dictionary<string, responseDelegate>();
         private GUIStyle windowStyle;
-        private Rect winRect = new Rect(0.0f, Screen.height - 300.0f, 400.0f, 300.0f);
+        private Rect winRect = new Rect(0.0f, Screen.height - 500.0f, 400.0f, 300.0f);
+        public NetworkThread networkThread;
+        private Thread thread, thread2;
+        public List<int> usersToGameObjects = new List<int>();
+        public List<VoiceChatPacket> vcps = new List<VoiceChatPacket>(); 
 
         delegate String responseDelegate(String message);
 
         public void Start()
         {
+            networkThread = new NetworkThread(Settings.ticks) {network = this};
             NetworkTransport.Init();
             ConnectionConfig config = new ConnectionConfig();
-            miscChannelId = config.AddChannel(QosType.Reliable);
-            blockChannelId = config.AddChannel(QosType.ReliableFragmented);
-            chatChannelId = config.AddChannel(QosType.Unreliable);
-            methodChannelId = config.AddChannel(QosType.Reliable);
-            importantChannelId = config.AddChannel(QosType.AllCostDelivery);
-            userChannelId = config.AddChannel(QosType.ReliableFragmented);
-            topology = new HostTopology(config, Settings.maxPlayers);
+            networkThread.miscChannelId = config.AddChannel(QosType.Reliable);
+            networkThread.blockChannelId = config.AddChannel(QosType.ReliableStateUpdate);
+            networkThread.chatChannelId = config.AddChannel(QosType.Unreliable);
+            networkThread.methodChannelId = config.AddChannel(QosType.Reliable);
+            networkThread.importantChannelId = config.AddChannel(QosType.AllCostDelivery);
+            networkThread.Topology = new HostTopology(config, Settings.maxPlayers);
             text = gameObject.GetComponent<GeneralGUI>().text;
             messages.Add("");
-            socketID = NetworkTransport.AddHost(topology, Settings.ServerPort);
-            Game.OnBlockPlaced += GameOnOnBlockPlaced;
-        }
-
-        private void GameOnOnBlockPlaced(Transform block)
-        {
-            int id = block.GetComponent<BlockBehaviour>().GetBlockID();
-            Vector3 pos = block.position;
-            Quaternion rot = block.rotation;
+            networkThread.socketID = NetworkTransport.AddHost(networkThread.Topology, Settings.Port);
+            thread = new Thread(new ThreadStart(networkThread.StartIt));
+            thread.Start();
+            ParameterizedThreadStart pst = Settings.SetNetworkAndStartCheckTicks;
+            thread2 = new Thread(pst);
+            thread2.Start(this);
+            gameObject.AddComponent<VoiceChatPlayer>();
+            VoiceChatRecorder vcr = gameObject.AddComponent<VoiceChatRecorder>();
+            vcr.network = this;
+            vcr.NetworkId = networkThread.socketID;
+            gameObject.AddComponent<VoiceChat.Scripts.VoiceChatManager>();
+            networkThread.StartIt();
         }
 
         public void Shutdown()
         {
-            NetworkTransport.RemoveHost(socketID);
+            NetworkTransport.RemoveHost(networkThread.socketID);
             NetworkTransport.Shutdown();
+            thread.Abort();
+            thread2.Abort();
         }
 
         public void Update()
         {
-            int outconnectionId;
-            int outchannelId;
-            byte[] buffer = new byte[1024];
-            int recSize;
-            int id;
-            byte error;
-            NetworkEventType recData = NetworkTransport.Receive(out id, out outconnectionId, out outchannelId, buffer, 1024, out recSize, out error);
-
-            switch (recData)
-            {
-                case NetworkEventType.Nothing:
-                {
-                    break;
-                }
-                case NetworkEventType.ConnectEvent:
-                {
-                    if (outconnectionId == connectionId)
-                    {
-                        SendMessage("Name:" + Settings.Name + ",Adress:" + Settings.adress + ",Port:" + Settings.ServerPort, miscChannelId, connectionId);
-                    }
-                    break;
-                }
-                case NetworkEventType.DisconnectEvent:
-                {
-                    if (outconnectionId == connectionId)
-                    {
-                        //Revert changes done while playing
-                    }
-                    break;
-                }
-                case NetworkEventType.DataEvent:
-                {
-                    if (outchannelId == chatChannelId)
-                    {
-                        messages.Add(Encoding.Unicode.GetString(buffer));
-                        break;
-                    }
-
-                    if (outchannelId == miscChannelId)
-                    {
-                        string mess = Convert(buffer);
-                        //Client sent his name, adress and port to Server which is now registering him and then sending that info to all Clients
-                        if (mess.StartsWith("Name:"))
-                        {
-                            UserInfoReceivedFromClient(mess, outconnectionId);
-                            break;
-                        }
-
-                        //Method response received
-                        if (mess.StartsWith("MethodResponse"))
-                        {
-                            String[] parts = mess.Split(':');
-                            String response = "";
-                            for (int i = 2; i < parts.Length; i++)
-                            {
-                                response += parts[i];
-                            }
-                            responses[parts[1]].Invoke(response);
-                        }
-                        break;
-                    }
-
-                    //Client received info of another Client and is now registering him
-                    if (outchannelId == userChannelId)
-                    {
-                        UserInfoReceivedFromServer(buffer);
-                        break;
-                    }
-                    //method received
-                    if (outchannelId == methodChannelId)
-                    {
-                        byte err;
-                        String wholemethod = Convert(buffer);
-                        String[] parts = wholemethod.Split(':');
-                        String method = "";
-                        for (int i = 1; i < parts.Length; i++)
-                        {
-                            method += parts[i];
-                        }
-                        Func<String> func = () => method;
-                        byte[] answer = ConvertObject("MethodResponse:" + parts[0] + ":" + func.Invoke());
-                        NetworkTransport.Send(socketID, outconnectionId, miscChannelId, answer, answer.Length, out err);
-                    }
-
-                    //handle info for blocks etc
-
-                    break;
-                }
-            }
-
-
             if (show.Pressed())
             {
                 showWin = !showWin;
             }
+            lock (usersToGameObjects)
+            {
+                if (usersToGameObjects.Count > 0)
+                {
+                    lock (networkThread._users)
+                    {
+                        foreach (int usersToGameObject in usersToGameObjects)
+                        {
+                            networkThread._users[usersToGameObject].gameObjects = new Dictionary<string, Component>()
+                            {
+                                {"AddPiece", gameObject.AddComponent<AddPieceMP>()},
+                                {"Machine", gameObject.AddComponent<MachineMP>()},
+                                {"MOT", gameObject.AddComponent<MachineObjectTracker>()}
+                            };
+                        }
+                    }
+                }
+            }
+            lock (vcps)
+            {
+                if (vcps.Count > 0)
+                {
+                    foreach (VoiceChatPacket voiceChatPacket in vcps)
+                    {
+                        VoiceChatManager.OnClientPacketReceived(voiceChatPacket);
+                    }
+                }
+            }
         }
 
+        #region Legacy
+        /*
         private void UserInfoReceivedFromServer(byte[] buffer)
         {
             User us = ConvertUser(buffer);
@@ -248,6 +190,8 @@ namespace BesiegeMP
             byte err;
             NetworkTransport.Send(socketID, connectionID, channelId, buff, buff.Length, out err);
         }
+        */
+        #endregion
 
         public void OnGUI()
         {
@@ -273,20 +217,23 @@ namespace BesiegeMP
 
         private void WinFunc(int id)
         {
-            if (messages.Count > 0)
+            lock (messages)
             {
-                pos = GUILayout.BeginScrollView(pos);
-                foreach (string s in messages)
+                if (messages.Count > 0)
                 {
-                    GUILayout.Label(s);
+                    pos = GUILayout.BeginScrollView(pos);
+                    foreach (string s in messages)
+                    {
+                        GUILayout.Label(s);
+                    }
+                    GUILayout.EndScrollView();
                 }
-                GUILayout.EndScrollView();
             }
 
             Event e = Event.current;
             if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() == "chatInput" && Regex.IsMatch(message, @"[^\s]"))
             {
-                SendChatMessage(message);
+                networkThread.ChatmessagesToSend.Add(Settings.Name + ":" + message);
                 message = "";
             }
 
@@ -304,6 +251,11 @@ namespace BesiegeMP
         private byte[] Convert(string buff)
         {
             return Encoding.Unicode.GetBytes(buff);
+        }
+
+        public void OnDestroy()
+        {
+            Shutdown();
         }
     }
 }

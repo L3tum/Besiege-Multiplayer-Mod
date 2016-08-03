@@ -1,8 +1,11 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
+using BesiegeMP.VoiceChat.Scripts;
 using spaar.ModLoader;
 using spaar.ModLoader.UI;
 using UnityEngine;
+using VoiceChat;
 
 namespace BesiegeMP
 {
@@ -10,12 +13,13 @@ namespace BesiegeMP
     {
         private int _winID = spaar.ModLoader.Util.GetWindowID();
         private int _helpID = spaar.ModLoader.Util.GetWindowID();
-        private Rect _winRect = new Rect(100.0f, 100.0f, 500.0f, 400.0f);
+        private Rect _winRect = new Rect(100.0f, 100.0f, 500.0f, 450.0f);
         public Texture2D text;
         private GUIStyle _toggleStyle, _labelStyle, _headlineStyle, _defaultLabel, _windowStyle;
         private bool show, stylesDone;
         private String lastTooltip = "";
         private readonly Key showKey = spaar.ModLoader.Keybindings.AddKeybinding("Multiplayer", new Key(KeyCode.LeftControl, KeyCode.B));
+
 
         public void Start()
         {
@@ -48,6 +52,9 @@ namespace BesiegeMP
                         new RectOffset(GUI.skin.textField.margin.left, GUI.skin.textField.margin.right, GUI.skin.textField.margin.top, GUI.skin.textField.margin.bottom),
                     border = GUI.skin.textField.border,
                     alignment = TextAnchor.LowerRight,
+                    contentOffset = GUI.skin.textField.contentOffset,
+                    padding = GUI.skin.textField.padding,
+                    font = GUI.skin.textField.font
                 };
                 _headlineStyle = new GUIStyle(GUI.skin.label)
                 {
@@ -82,7 +89,10 @@ namespace BesiegeMP
             GUILayout.BeginHorizontal();
             GUILayout.Label(new GUIContent("Name:", "Your name. Will be visible in-game"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
-            Settings.Name = GUILayout.TextField(Settings.Name);
+            lock (Settings.Name)
+            {
+                Settings.Name = GUILayout.TextField(Settings.Name);
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.Space(5.0f);
@@ -90,7 +100,10 @@ namespace BesiegeMP
             GUILayout.BeginHorizontal();
             GUILayout.Label(new GUIContent("Location:", "The Location of you, either Server or Client. Will be used to enhance match searching"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
-            Settings.Location = GUILayout.TextField(Settings.Location);
+            lock (Settings.Location)
+            {
+                Settings.Location = GUILayout.TextField(Settings.Location);
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.Space(5.0f);
@@ -98,7 +111,10 @@ namespace BesiegeMP
             GUILayout.BeginHorizontal();
             GUILayout.Label(new GUIContent("Server Name:", "The name the server will be visible in the matchmaking list. Choose a descriptive, unique name"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
-            Settings.ServerName = GUILayout.TextField(Settings.ServerName);
+            lock (Settings.ServerName)
+            {
+                Settings.ServerName = GUILayout.TextField(Settings.ServerName);
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.Space(5.0f);
@@ -106,8 +122,8 @@ namespace BesiegeMP
             GUILayout.BeginHorizontal();
             GUILayout.Label(new GUIContent("Port:", "The port the Multiplayer will use. Leave this on default if you're not planning on hosting/joining multiple games"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
-            Settings.ServerPort =
-                Int32.Parse(GUILayout.TextField(Settings.ServerPort.ToString()));
+            Settings.Port =
+                Int32.Parse(GUILayout.TextField(Settings.Port.ToString()));
             GUILayout.EndHorizontal();
 
             GUILayout.Space(5.0f);
@@ -115,7 +131,10 @@ namespace BesiegeMP
             GUILayout.BeginHorizontal();
             GUILayout.Label(new GUIContent("Server Password:", "Password of the Server. Leave it empty if anyone can connect"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
-            Settings.ServerPassword = GUILayout.TextField(Settings.ServerPassword);
+            lock (Settings.ServerPassword)
+            {
+                Settings.ServerPassword = GUILayout.TextField(Settings.ServerPassword);
+            }
             GUILayout.EndHorizontal();
 
             GUILayout.Space(5.0f);
@@ -130,25 +149,32 @@ namespace BesiegeMP
             GUILayout.Space(5.0f);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Space(50.0f);
-            Settings.getLocation = GUILayout.Toggle(Settings.getLocation, new GUIContent("Get Location", "Toggles the Usage of an API to determine your location for better matchmaking"), _toggleStyle, GUILayout.Width(200.0f));
-            GUILayout.Space(50.0f);
+            GUILayout.Label(new GUIContent("Ticks:", "The number of times per second the update thread of the Multiplayer will be called. Increasing this number will result in better precision and worse performance. Use with caution."), _labelStyle, GUILayout.Width(200.0f));
+            GUILayout.Space(25.0f);
+            Settings.ticks =
+                Int32.Parse(GUILayout.TextField(Settings.ticks.ToString()));
+            GUILayout.EndHorizontal();
+
+            GUILayout.Space(5.0f);
+
+            GUILayout.BeginHorizontal();
+            GUILayout.Space(25.0f);
+            Settings.serverDistributesEverything = GUILayout.Toggle(Settings.serverDistributesEverything,
+                new GUIContent("Server Distribution",
+                    "If 'true' the Server will receive everything and then distribute everything. If you got weak Clients, but a strong Server, set this to true. Otherwise false."), _toggleStyle);
+            GUILayout.Space(25.0f);
+            Settings.getLocation = GUILayout.Toggle(Settings.getLocation, new GUIContent("Get Location", "Toggles the Usage of an API to determine your location for better matchmaking"), _toggleStyle);
+            GUILayout.Space(25.0f);
             GUILayout.EndHorizontal();
 
             GUILayout.Space(10.0f);
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(new GUIContent("Start Dedicated Server", "Starts a dedicated Server")))
+            if (GUILayout.Button(new GUIContent("Start", "Starts a new Socket for the Multiplayer")))
             {
-                gameObject.AddComponent<DedicatedServer>();
-            }
-            if (GUILayout.Button(new GUIContent("Start Server", "Starts a normal Server with you as host")))
-            {
-                gameObject.AddComponent<Server>();
-            }
-            if (GUILayout.Button(new GUIContent("Client", "Starts the Client to connect to Servers")))
-            {
-                gameObject.AddComponent<Client>();
+                gameObject.AddComponent<VoiceChatSettings>();
+                gameObject.AddComponent<AudioSource>();
+                Network.Network network = gameObject.AddComponent<Network.Network>();
             }
             GUILayout.EndHorizontal();
 

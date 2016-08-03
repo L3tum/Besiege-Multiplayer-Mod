@@ -41,7 +41,7 @@ namespace BesiegeMP
 
         public void StartHost()
         {
-            socketID = NetworkTransport.AddHost(topology, Settings.ServerPort);
+            socketID = NetworkTransport.AddHost(topology, Settings.Port);
         }
 
         public void StopHost()

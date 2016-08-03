@@ -16,5 +16,6 @@ namespace BesiegeMP
         public String name;
         public String adress;
         public int port;
+        public int userSocketID;
     }
 }

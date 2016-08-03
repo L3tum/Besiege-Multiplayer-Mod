@@ -19,16 +19,21 @@ Server
 }
 
 
--User kann timestep für Update auswählen
--Update in separatem thread
+-User kann timestep für Update auswählen DONE
+-Update in separatem thread DONE
 -Sync in separatem thread
 -Server kann timestep für sync auswählen
--Die Nummer des Steps wird mitgesendet
+-Die Nummer des Steps wird mitgesendet //NE(?)
 -Ankündigung eines syncs für den nächsten Sync step sowie Update-Step für den User(Mathematik..eine Menge wird gebraucht....sowas von kein Bock)
 -Loader mod der alles andere runterlädt(vielleicht, ist eigentlich bisher noch nicht gebraucht)
--voice chat
+-voice chat DONE
 -Spectator
 -Spectator enabling
 -shorts instead of ints
 -Client to client communication settings
 -Server list
+-teams
+-arena
+-server scripts
+
+-Server als Distributor of Everything. Verschiedene Modi für NetworkThread
