@@ -6,7 +6,7 @@ namespace BesiegeMP.Network
 {
     class NetworkData
     {
-        public int connectionId;
+        public int connectionId = -1;
         public int channelId;
         public NetworkMessage message;
         public byte[] messageBytes;

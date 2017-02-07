@@ -2,7 +2,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading;
 using BesiegeMP.VoiceChat.Scripts;
@@ -19,72 +18,92 @@ namespace BesiegeMP.Network
     internal class Network : MonoBehaviour
     {
         private readonly int _winId = spaar.ModLoader.Util.GetWindowID();
-        private string message = "";
-        public readonly List<string> messages = new List<string>();
-        private Vector2 pos;
-        private string sAdress;
-        private readonly Key show = Keybindings.AddKeybinding("Chat", new Key(KeyCode.LeftControl, KeyCode.Q));
-        private bool showWin, stylesDone, isServer;
-        private Texture2D text;
-        private GUIStyle windowStyle;
-        private Rect winRect = new Rect(0.0f, Screen.height - 500.0f, 400.0f, 300.0f);
-        public NetworkThread networkThread;
-        private Thread thread, thread2;
-        public List<int> usersToGameObjects = new List<int>();
-        public List<VoiceChatPacket> vcps = new List<VoiceChatPacket>(); 
+        public readonly List<string> Messages = new List<string>();
+        private readonly Key _show = Keybindings.AddKeybinding("Chat", new Key(KeyCode.LeftControl, KeyCode.Q));
+        public readonly List<int> UsersJoinedNeedingSetup = new List<int>();
+        public readonly List<VoiceChatPacket> Vcps = new List<VoiceChatPacket>();
+        private string _message = "";
+        public NetworkThread NetworkThread;
+        private Vector2 _pos;
+        private bool _showWin, _stylesDone;
+        private Texture2D _text;
+        private Thread _thread, _thread2;
+        private GUIStyle _windowStyle;
+        private Rect _winRect = new Rect(0.0f, Screen.height - 500.0f, 400.0f, 300.0f);
 
-        delegate String responseDelegate(String message);
-
-        public void Start()
+        public void StartIt(bool isServer)
         {
-            networkThread = new NetworkThread(Settings.ticks) {network = this};
+            Util.network = this;
+            NetworkThread = new NetworkThread(Settings.ticks, isServer) {Network = this};
             NetworkTransport.Init();
-            ConnectionConfig config = new ConnectionConfig();
-            networkThread.miscChannelId = config.AddChannel(QosType.Reliable);
-            networkThread.blockChannelId = config.AddChannel(QosType.ReliableStateUpdate);
-            networkThread.chatChannelId = config.AddChannel(QosType.Unreliable);
-            networkThread.methodChannelId = config.AddChannel(QosType.Reliable);
-            networkThread.importantChannelId = config.AddChannel(QosType.AllCostDelivery);
-            networkThread.Topology = new HostTopology(config, Settings.maxPlayers);
-            text = gameObject.GetComponent<GeneralGUI>().text;
-            messages.Add("");
-            networkThread.socketID = NetworkTransport.AddHost(networkThread.Topology, Settings.Port);
-            thread = new Thread(new ThreadStart(networkThread.StartIt));
-            thread.Start();
-            ParameterizedThreadStart pst = Settings.SetNetworkAndStartCheckTicks;
-            thread2 = new Thread(pst);
-            thread2.Start(this);
+            ConnectionConfig Config = new ConnectionConfig();
+            NetworkThread.MiscChannelId = Config.AddChannel(QosType.Reliable);
+            NetworkThread.BlockChannelId = Config.AddChannel(QosType.ReliableStateUpdate);
+            NetworkThread.ChatChannelId = Config.AddChannel(QosType.Unreliable);
+            NetworkThread.MethodChannelId = Config.AddChannel(QosType.Reliable);
+            NetworkThread.ImportantChannelId = Config.AddChannel(QosType.AllCostDelivery);
+            NetworkThread.Topology = new HostTopology(Config, Settings.maxPlayers);
+            _text = gameObject.GetComponent<GeneralGUI>().text;
+            Messages.Add("");
+            NetworkThread.SocketId = NetworkTransport.AddHost(NetworkThread.Topology, Settings.Port);
+            _thread = new Thread(NetworkThread.StartIt);
+            _thread.Start();
+            ParameterizedThreadStart Pst = Settings.SetNetworkAndStartCheckTicks;
+            _thread2 = new Thread(Pst);
+            _thread2.Start(this);
             gameObject.AddComponent<VoiceChatPlayer>();
-            VoiceChatRecorder vcr = gameObject.AddComponent<VoiceChatRecorder>();
-            vcr.network = this;
-            vcr.NetworkId = networkThread.socketID;
-            gameObject.AddComponent<VoiceChat.Scripts.VoiceChatManager>();
-            networkThread.StartIt();
+            VoiceChatRecorder Vcr = gameObject.AddComponent<VoiceChatRecorder>();
+            Vcr.NetworkId = NetworkThread.SocketId;
+            gameObject.AddComponent<VoiceChatManager>();
+            NetworkThread.StartIt();
+            spaar.Commands.RegisterCommand("Connect", ConnectCallback, "Connects to a Server specified with 'Full.IP.Adress:Port'");
+            spaar.Commands.RegisterCommand("Disconnect", DisconnectCallback, "Disconnects you from the Server");
+            spaar.Commands.RegisterCommand("GetMyIP", IPCallback, "Returns your IP adress used to connect to your Server");
+        }
+
+        private string IPCallback(string[] args, IDictionary<string, string> namedArgs)
+        {
+            return Settings.adress;
+        }
+
+        private string DisconnectCallback(string[] args, IDictionary<string, string> namedArgs)
+        {
+            byte er;
+            NetworkTransport.Disconnect(NetworkThread.SocketId, NetworkThread.ConnectionId, out er);
+            return "Disconnected from " + NetworkThread.Server.name;
+        }
+
+        private string ConnectCallback(string[] args, IDictionary<string, string> namedArgs)
+        {
+            byte er;
+            String[] adressParts = args[0].Split(':');
+            NetworkThread.ConnectionId = NetworkTransport.Connect(NetworkThread.SocketId, adressParts[0], int.Parse(adressParts[1]), 0, out er);
+            return "Connected to " + adressParts[0] + "\nConnection ID:" + NetworkThread.ConnectionId;
         }
 
         public void Shutdown()
         {
-            NetworkTransport.RemoveHost(networkThread.socketID);
+            NetworkTransport.RemoveHost(NetworkThread.SocketId);
             NetworkTransport.Shutdown();
-            thread.Abort();
-            thread2.Abort();
+            _thread.Abort();
+            _thread2.Abort();
         }
 
         public void Update()
         {
-            if (show.Pressed())
+            if (_show.Pressed())
             {
-                showWin = !showWin;
+                _showWin = !_showWin;
             }
-            lock (usersToGameObjects)
+            lock (UsersJoinedNeedingSetup)
             {
-                if (usersToGameObjects.Count > 0)
+                if (UsersJoinedNeedingSetup.Count > 0)
                 {
-                    lock (networkThread._users)
+                    lock (NetworkThread.Users)
                     {
-                        foreach (int usersToGameObject in usersToGameObjects)
+                        for (int Index = 0; Index < UsersJoinedNeedingSetup.Count; Index++)
                         {
-                            networkThread._users[usersToGameObject].gameObjects = new Dictionary<string, Component>()
+                            NetworkThread.Users[UsersJoinedNeedingSetup[Index]].gameObjects = new Dictionary<string, Component>
                             {
                                 {"AddPiece", gameObject.AddComponent<AddPieceMP>()},
                                 {"Machine", gameObject.AddComponent<MachineMP>()},
@@ -94,26 +113,83 @@ namespace BesiegeMP.Network
                     }
                 }
             }
-            lock (vcps)
+            lock (Vcps)
             {
-                if (vcps.Count > 0)
+                if (Vcps.Count > 0)
                 {
-                    foreach (VoiceChatPacket voiceChatPacket in vcps)
+                    for (int Index = 0; Index < Vcps.Count; Index++)
                     {
-                        VoiceChatManager.OnClientPacketReceived(voiceChatPacket);
+                        VoiceChatManager.OnClientPacketReceived(Vcps[Index]);
                     }
                 }
             }
         }
 
+        public void OnGUI()
+        {
+            if (_showWin)
+            {
+                if (!_stylesDone)
+                {
+                    GUI.skin = ModGUI.Skin;
+                    _windowStyle = new GUIStyle(GUI.skin.window)
+                    {
+                        normal = new GUIStyleState
+                        {
+                            background = _text,
+                            textColor = GUI.skin.window.normal.textColor
+                        }
+                    };
+                    _stylesDone = true;
+                }
+                GUI.skin = ModGUI.Skin;
+                _winRect = GUI.Window(_winId, _winRect, WinFunc, "Chat", _windowStyle);
+            }
+        }
+
+        private void WinFunc(int id)
+        {
+            lock (Messages)
+            {
+                if (Messages.Count > 0)
+                {
+                    _pos = GUILayout.BeginScrollView(_pos);
+                    for (int Index = 0; Index < Messages.Count; Index++)
+                    {
+                        GUILayout.Label(Messages[Index]);
+                    }
+                    GUILayout.EndScrollView();
+                }
+            }
+
+            Event e = Event.current;
+            if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() == "chatInput" && Regex.IsMatch(_message, @"[^\s]"))
+            {
+                Util.SendGenericMessageAndFigureOutIfSDE(new NetworkData(NetworkThread.ChatChannelId, new NetworkMessage(Settings.Name + ":" + _message, NetworkMessageEnum.ChatMessage)));
+                _message = "";
+            }
+
+            GUI.SetNextControlName("chatInput");
+            _message = GUILayout.TextField(_message);
+            GUI.DragWindow();
+        }
+
+        public void OnDestroy()
+        {
+            Shutdown();
+        }
+
+        private delegate string responseDelegate(string message);
+
         #region Legacy
+
         /*
         private void UserInfoReceivedFromServer(byte[] buffer)
         {
             User us = ConvertUser(buffer);
             byte err;
             Users.Add(us.name, us);
-            int connectionID = NetworkTransport.Connect(socketID, us.adress, us.port, 0, out err);
+            int connectionID = NetworkTransport.Connect(SocketId, us.adress, us.port, 0, out err);
             Users[us.name].gameObjects = new Dictionary<string, Component>
             {
                 {"AddPiece", gameObject.AddComponent<AddPiece>()},
@@ -151,14 +227,14 @@ namespace BesiegeMP.Network
             responses.Add(methodName, (x) => response);
             byte[] mess = Convert(methodName + ":" + method);
             byte error;
-            NetworkTransport.Send(socketID, connID, methodChannelId, mess, mess.Length, out error);
+            NetworkTransport.Send(SocketId, connID, MethodChannelId, mess, mess.Length, out error);
         }
 
         private void SendChatMessage(string messa)
         {
             foreach (var user in Users.Values)
             {
-                SendMessage(Settings.Name + ":" + messa, chatChannelId, user.connectionID);
+                SendMessage(Settings.Name + ":" + messa, ChatChannelId, user.connectionID);
             }
         }
 
@@ -181,81 +257,17 @@ namespace BesiegeMP.Network
         private void SendUserObject(User user, int channelID, int connectionID)
         {
             byte error;
-            NetworkTransport.Send(socketID, connectionID, channelID, ConvertObject(user), 1024, out error);
+            NetworkTransport.Send(SocketId, connectionID, channelID, ConvertObject(user), 1024, out error);
         }
 
-        private void SendMessage(string message, int channelId, int connectionID)
+        private void SendMessage(string _message, int channelId, int connectionID)
         {
-            byte[] buff = Convert(message);
+            byte[] buff = Convert(_message);
             byte err;
-            NetworkTransport.Send(socketID, connectionID, channelId, buff, buff.Length, out err);
+            NetworkTransport.Send(SocketId, connectionID, channelId, buff, buff.Length, out err);
         }
         */
+
         #endregion
-
-        public void OnGUI()
-        {
-            if (showWin)
-            {
-                if (!stylesDone)
-                {
-                    GUI.skin = ModGUI.Skin;
-                    windowStyle = new GUIStyle(GUI.skin.window)
-                    {
-                        normal = new GUIStyleState
-                        {
-                            background = text,
-                            textColor = GUI.skin.window.normal.textColor
-                        }
-                    };
-                    stylesDone = true;
-                }
-                GUI.skin = ModGUI.Skin;
-                winRect = GUI.Window(_winId, winRect, WinFunc, "Chat", windowStyle);
-            }
-        }
-
-        private void WinFunc(int id)
-        {
-            lock (messages)
-            {
-                if (messages.Count > 0)
-                {
-                    pos = GUILayout.BeginScrollView(pos);
-                    foreach (string s in messages)
-                    {
-                        GUILayout.Label(s);
-                    }
-                    GUILayout.EndScrollView();
-                }
-            }
-
-            Event e = Event.current;
-            if (e.type == EventType.KeyDown && e.keyCode == KeyCode.Return && GUI.GetNameOfFocusedControl() == "chatInput" && Regex.IsMatch(message, @"[^\s]"))
-            {
-                networkThread.ChatmessagesToSend.Add(Settings.Name + ":" + message);
-                message = "";
-            }
-
-            GUI.SetNextControlName("chatInput");
-            message = GUILayout.TextField(message);
-            GUI.DragWindow();
-        }
-
-
-        private string Convert(byte[] buffer)
-        {
-            return Encoding.Unicode.GetString(buffer);
-        }
-
-        private byte[] Convert(string buff)
-        {
-            return Encoding.Unicode.GetBytes(buff);
-        }
-
-        public void OnDestroy()
-        {
-            Shutdown();
-        }
     }
 }

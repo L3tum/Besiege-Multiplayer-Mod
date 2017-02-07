@@ -84,6 +84,8 @@ namespace BesiegeMP
 
         private bool enableAdaptiveCam;
 
+        public MachineObjectTrackerMP motMP;
+
         public override Dictionary<string, XData> AdditionalData
         {
             get { return new Dictionary<string, XData>(this.additionalData); }
@@ -191,21 +193,19 @@ namespace BesiegeMP
             this.activeBlocksSet = new HashSet<int>();
             this.machineEndPoints = new LinkedList<BlockBehaviour>();
             this.endPointWeights = new Dictionary<BlockBehaviour, int>();
-            this.cameraAverage = Vector3.zero;
-            this.cameraUpdate = true;
         }
 
-        public static Machine Active()
+        public Machine Active()
         {
-            return SingleInstance<MachineObjectTracker>.Instance.ActiveMachine;
+            return motMP.ActiveMachine;
         }
 
-        public override BlockBehaviour AddBlock(BlockInfo blockInfo)
+        public BlockBehaviour AddBlock(BlockInfo blockInfo, bool copy)
         {
-            return this.AddBlock(blockInfo, true);
+            return this.AddBlock(blockInfo, true, copy);
         }
 
-        private BlockBehaviour AddBlock(BlockInfo blockInfo, bool tryAgain)
+        private BlockBehaviour AddBlock(BlockInfo blockInfo, bool tryAgain, bool copy)
         {
             BlockBehaviour blockBehaviour;
             BlockBehaviour block = PrefabMaster.GetBlock(blockInfo.ID);
@@ -225,10 +225,6 @@ namespace BesiegeMP
                     blockBehaviour = null;
                     return blockBehaviour;
                 }
-                if (blockInfo.ID == 57 || blockInfo.ID == 58)
-                {
-                    SingleInstance<AddPiece>.Instance.checkPinBlocks = true;
-                }
                 BlockBehaviour scale = (BlockBehaviour)Instantiate(block, blockInfo.Position, blockInfo.Rotation);
                 scale.name = block.name;
                 scale.transform.SetParent(this.machine, false);
@@ -245,7 +241,7 @@ namespace BesiegeMP
                     num++;
                 }
                 XDataHolder xDataHolder = null;
-                if (!AddPiece.usingCopiedBlock || AddPiece.copiedBlockData == null)
+                if (copy)
                 {
                     xDataHolder = blockInfo.BlockData.Clone();
                     xDataHolder.WasCreated = true;
@@ -253,13 +249,12 @@ namespace BesiegeMP
                 }
                 else
                 {
-                    xDataHolder = AddPiece.copiedBlockData.Clone();
+                    xDataHolder = addPiece.copiedBlockData.Clone();
                     xDataHolder.WasCreated = true;
                     block.OnLoad(xDataHolder);
                 }
-                ReferenceMaster.BuildingBlocks.Add(block);
+                Blocks.Add(block);
                 block.StoreInitialData();
-                SingleInstance<AddPiece>.Instance.UpdateBlockAndMassText(this.Mass, StatMaster.BlockCount);
                 blockBehaviour = block;
                 return blockBehaviour;
             }
@@ -271,10 +266,11 @@ namespace BesiegeMP
             return blockBehaviour;
         }
 
-        public override BlockBehaviour AddBlock(Vector3 position, Quaternion rotation, int id)
+        public BlockBehaviour AddBlock(Vector3 position, Quaternion rotation, int id, Guid GUID)
         {
             BlockInfo blockInfo = new BlockInfo()
             {
+                Guid = GUID,
                 ID = id,
                 Position = position,
                 Rotation = rotation,
@@ -284,10 +280,11 @@ namespace BesiegeMP
             return this.AddBlock(blockInfo);
         }
 
-        public override BlockBehaviour AddBlockGlobal(Vector3 position, Quaternion rotation, int id)
+        public BlockBehaviour AddBlockGlobal(Vector3 position, Quaternion rotation, int id, Guid GUID)
         {
             BlockInfo blockInfo = new BlockInfo()
             {
+                Guid = GUID,
                 ID = id,
                 Position = this.BuildingMachine.InverseTransformPoint(position),
                 Rotation = Quaternion.Inverse(this.BuildingMachine.rotation)*rotation,
@@ -307,16 +304,16 @@ namespace BesiegeMP
         public override void Awake()
         {
             this.transform.position = Vector3.zero;
-            this.machine = (new GameObject("Building Machine")).transform;
+            this.machine = (new GameObject("Building Machine[" + Settings.Name + "]")).transform;
             this.machine.SetParent(this.transform);
             this.machine.position = Vector3.up*(float) 6;
             this.undoSystem = this.gameObject.AddComponent<UndoSystem>();
             this.undoSystem.Machine = this;
-            ReferenceMaster.UndoSystemGO = this.gameObject;
-            SingleInstance<MachineObjectTracker>.Instance.SetActiveMachine(this);
+            motMP.SetActiveMachine(this);
             this.lastMachinePosition = Vector3.up*6f;
         }
 
+        //TODO
         private void CalculateEndWeights()
         {
             this.endPointWeights.Clear();
@@ -364,10 +361,10 @@ namespace BesiegeMP
         public override Vector3 CalculateMiddle()
         {
             Vector3 vector3;
-            List<BlockBehaviour> blockBehaviours = (!this.simulationClone ? ReferenceMaster.BuildingBlocks : this.simulationBlocks);
+            List<BlockBehaviour> blockBehaviours = (!this.simulationClone ? this.BuildingBlocks : this.simulationBlocks);
             Vector3 vector31 = new Vector3();
             int num = 0;
-            this._middleIncrement = (this._isFirstMiddle || !AddPiece.isSimulating ? 1 : 2);
+            this._middleIncrement = (this._isFirstMiddle || !StatMaster.isSimulating ? 1 : 2);
             int num1 = (!this._hasTempMiddle ? 0 : 1);
             Vector3 vector32 = new Vector3();
             BlockBehaviour item = null;
@@ -393,7 +390,7 @@ namespace BesiegeMP
             if (num != 0)
             {
                 Vector3 vector33 = vector31/(float) num;
-                if (this._isFirstMiddle || !AddPiece.isSimulating || num == count)
+                if (this._isFirstMiddle || !StatMaster.isSimulating || num == count)
                 {
                     this._machineMiddle = vector33;
                 }

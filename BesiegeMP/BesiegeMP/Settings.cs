@@ -11,7 +11,6 @@ namespace BesiegeMP
     {
         private static readonly string SettingsPath = Application.dataPath + "/Mods/settings.bmp.xml";
         public static String Name = "";
-        public static String ServerName = "";
         public static int Port = 8888;
         public static String Location = "Tannu Tuva";
         public static bool getLocation = true;
@@ -27,7 +26,7 @@ namespace BesiegeMP
 
         internal static void Save()
         {
-            SaveSettings ss = new SaveSettings(Name, ServerName, Port, Location, getLocation, ServerPassword, maxPlayers, ticks, serverDistributesEverything);
+            SaveSettings ss = new SaveSettings(Name, Port, Location, getLocation, ServerPassword, maxPlayers, ticks, serverDistributesEverything);
             new XmlSerializer(typeof(SaveSettings)).Serialize(new StreamWriter(SettingsPath, false), ss);
         }
 
@@ -51,11 +50,7 @@ namespace BesiegeMP
                 {
                     Name = ss.Name;
                 }
-                lock (ServerName)
-                {
-                    ServerName = ss.ServerName;
-                }
-                    Port = ss.ServerPort;
+                Port = ss.ServerPort;
                 getLocation = ss.getLoc;
                 lock (ServerPassword)
                 {
@@ -81,10 +76,6 @@ namespace BesiegeMP
                 {
                     Name = name.name;
                 }
-                lock (ServerName)
-                {
-                    ServerName = name.surname;
-                }
             }
             catch (Exception ex)
             {
@@ -94,10 +85,6 @@ namespace BesiegeMP
                 {
                     Name = name.name;
                 }
-                lock (ServerName)
-                {
-                    ServerName = name.surname;
-                }
             }
         }
 
@@ -105,7 +92,7 @@ namespace BesiegeMP
         {
             if (oldTicks != ticks)
             {
-                network.networkThread.ChangeTicks(ticks);
+                network.NetworkThread.ChangeTicks(ticks);
                 oldTicks = ticks;
             }
         }
@@ -120,7 +107,6 @@ namespace BesiegeMP
     internal class SaveSettings
     {
         public string Name;
-        public String ServerName;
         public int ServerPort;
         public String Location;
         public bool getLoc;
@@ -129,10 +115,9 @@ namespace BesiegeMP
         public int ticks;
         public bool sde;
 
-        public SaveSettings(string Name, string serverName, int serverPort, String location, bool getloc, String serverPass, int max, int ticks, bool SdE)
+        public SaveSettings(string Name, int serverPort, String location, bool getloc, String serverPass, int max, int ticks, bool SdE)
         {
             this.Name = Name;
-            ServerName = serverName;
             ServerPort = serverPort;
             Location = location;
             getLoc = getloc;

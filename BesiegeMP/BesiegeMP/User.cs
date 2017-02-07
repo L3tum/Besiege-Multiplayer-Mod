@@ -17,5 +17,14 @@ namespace BesiegeMP
         public String adress;
         public int port;
         public int userSocketID;
+        public int ID;
+
+        private static int userIDs = -2;
+
+        public static int GetNextID()
+        {
+            userIDs++;
+            return userIDs;
+        }
     }
 }

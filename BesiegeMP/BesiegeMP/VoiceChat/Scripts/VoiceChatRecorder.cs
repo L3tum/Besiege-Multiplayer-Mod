@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using BesiegeMP.Network;
 using spaar.ModLoader;
 using UnityEngine;
 using Network = BesiegeMP.Network.Network;
+using Util = BesiegeMP.Util;
 
 namespace VoiceChat
 {
@@ -60,7 +62,6 @@ namespace VoiceChat
         float[] fftBuffer = null;
         float[] sampleBuffer = null;
         VoiceChatCircularBuffer<float[]> previousSampleBuffer = new VoiceChatCircularBuffer<float[]>(5);
-        internal Network network;
 
         public Key PushToTalkKey;
 
@@ -130,15 +131,11 @@ namespace VoiceChat
             }
             instance = this;
             NewSample += OnNewSample;
-            network = gameObject.GetComponent<Network>();
         }
 
         private void OnNewSample(VoiceChatPacket voiceChatPacket)
         {
-            lock (network.networkThread.voiceChatPacketsToSend)
-            {
-                network.networkThread.voiceChatPacketsToSend.Add(voiceChatPacket);
-            }
+            Util.SendGenericMessageAndFigureOutIfSDE(new NetworkData(Util.network.NetworkThread.ChatChannelId, new NetworkMessage(voiceChatPacket, NetworkMessageEnum.VoiceChatMessage)));
         }
 
         void OnEnable()

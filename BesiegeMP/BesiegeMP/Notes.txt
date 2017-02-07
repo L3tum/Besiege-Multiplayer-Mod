@@ -30,10 +30,10 @@ Server
 -Spectator
 -Spectator enabling
 -shorts instead of ints
--Client to client communication settings
+-Client to client communication settings DONE
 -Server list
 -teams
 -arena
 -server scripts
 
--Server als Distributor of Everything. Verschiedene Modi für NetworkThread
+-Server als Distributor of Everything. Verschiedene Modi für NetworkThread DONE

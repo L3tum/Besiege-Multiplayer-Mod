@@ -11,6 +11,9 @@ namespace BesiegeMP.Network
         Block,
         Ping,
         ServerInfo,
-        ServerDistributesEverything
+        ServerDistributesEverything,
+        UserID,
+        UserClassList,
+        BlockInfo // Position, Rotation, ID
     }
 }

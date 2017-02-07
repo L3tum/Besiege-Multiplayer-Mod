@@ -30,6 +30,12 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <RunPostBuildEvent>Always</RunPostBuildEvent>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'DebugComp|AnyCPU'">
+    <OutputPath>bin\DebugComp\</OutputPath>
+  </PropertyGroup>
   <ItemGroup>
     <Reference Include="Assembly-CSharp">
       <HintPath>E:\Steeam\steamapps\common\Besiege\Besiege_Data\Managed\Assembly-CSharp.dll</HintPath>
@@ -92,6 +98,7 @@
     <Compile Include="DedicatedServer.cs" />
     <Compile Include="GeneralGUI.cs" />
     <Compile Include="MachineMP.cs" />
+    <Compile Include="MachineObjectTrackerMP.cs" />
     <Compile Include="Network\Network.cs" />
     <Compile Include="Network\NetworkData.cs" />
     <Compile Include="Network\NetworkMessage.cs" />
@@ -120,6 +127,7 @@
     <Content Include="Notes.txt" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="app.config" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

@@ -16,7 +16,7 @@ namespace BesiegeMP
         private Rect _winRect = new Rect(100.0f, 100.0f, 500.0f, 450.0f);
         public Texture2D text;
         private GUIStyle _toggleStyle, _labelStyle, _headlineStyle, _defaultLabel, _windowStyle;
-        private bool show, stylesDone;
+        private bool show, stylesDone, isRunning;
         private String lastTooltip = "";
         private readonly Key showKey = spaar.ModLoader.Keybindings.AddKeybinding("Multiplayer", new Key(KeyCode.LeftControl, KeyCode.B));
 
@@ -109,17 +109,6 @@ namespace BesiegeMP
             GUILayout.Space(5.0f);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(new GUIContent("Server Name:", "The name the server will be visible in the matchmaking list. Choose a descriptive, unique name"), _labelStyle, GUILayout.Width(200.0f));
-            GUILayout.Space(25.0f);
-            lock (Settings.ServerName)
-            {
-                Settings.ServerName = GUILayout.TextField(Settings.ServerName);
-            }
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space(5.0f);
-
-            GUILayout.BeginHorizontal();
             GUILayout.Label(new GUIContent("Port:", "The port the Multiplayer will use. Leave this on default if you're not planning on hosting/joining multiple games"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
             Settings.Port =
@@ -140,7 +129,7 @@ namespace BesiegeMP
             GUILayout.Space(5.0f);
 
             GUILayout.BeginHorizontal();
-            GUILayout.Label(new GUIContent("Max Players:", "The maximum amount of players on your server. If normal Server this number includes the host"), _labelStyle, GUILayout.Width(200.0f));
+            GUILayout.Label(new GUIContent("Max Players:", "The maximum amount of players on your Server. If normal Server this number includes the host"), _labelStyle, GUILayout.Width(200.0f));
             GUILayout.Space(25.0f);
             Settings.maxPlayers =
                 Int32.Parse(GUILayout.TextField(Settings.maxPlayers.ToString()));
@@ -170,11 +159,34 @@ namespace BesiegeMP
             GUILayout.Space(10.0f);
 
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button(new GUIContent("Start", "Starts a new Socket for the Multiplayer")))
+            if (GUILayout.Button(new GUIContent("StartServer", "Starts a new Server for the Multiplayer")))
             {
                 gameObject.AddComponent<VoiceChatSettings>();
                 gameObject.AddComponent<AudioSource>();
                 Network.Network network = gameObject.AddComponent<Network.Network>();
+                network.StartIt(true);
+            }
+            GUILayout.Space(25.0f);
+            if (!isRunning)
+            {
+                if (GUILayout.Button(new GUIContent("Start Client", "Starts a new Client for the Multiplayer")))
+                {
+                    gameObject.AddComponent<VoiceChatSettings>();
+                    gameObject.AddComponent<AudioSource>();
+                    Network.Network network = gameObject.AddComponent<Network.Network>();
+                    network.StartIt(false);
+                    isRunning = true;
+                }
+            }
+            if (isRunning)
+            {
+                if (GUILayout.Button(new GUIContent("Stop Client", "Stops the Client for the Multiplayer")))
+                {
+                    Destroy(gameObject.GetComponent<VoiceChatSettings>());
+                    Destroy(gameObject.GetComponent<AudioSource>());
+                    Destroy(gameObject.GetComponent<Network.Network>());
+                    isRunning = false;
+                }
             }
             GUILayout.EndHorizontal();
 

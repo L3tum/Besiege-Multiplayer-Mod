@@ -1,4 +1,5 @@
-﻿using spaar.ModLoader.UI;
+﻿using BesiegeMP.Network;
+using spaar.ModLoader.UI;
 using UnityEngine;
 using UnityEngine.Networking;
 using UnityEngine.Networking.NetworkSystem;
@@ -11,13 +12,10 @@ namespace BesiegeMP.VoiceChat.Scripts
         public delegate void MessageHandler<T>(T data);
         public static event MessageHandler<VoiceChatPacket> VoiceChatPacketReceived;
 
-        private static Network.Network network;
-
         VoiceChatPlayer player = null;
 
         void Start()
         {
-            network = gameObject.GetComponent<Network.Network>();
             VoiceChatPacketReceived += OnReceivePacket;
             gameObject.AddComponent<AudioSource>();
             player = gameObject.AddComponent<VoiceChatPlayer>();
@@ -36,10 +34,7 @@ namespace BesiegeMP.VoiceChat.Scripts
         #region Network Message Handlers
         internal static void OnClientPacketReceived(VoiceChatPacket packet)
         {
-            if (network.networkThread.ServerDistributesEverything && network.networkThread.isServer)
-            {
-                network.networkThread.voiceChatPacketsToSend.Add(packet);
-            }
+            Util.SendGenericMessageAndFigureOutIfSDE(new NetworkData(Util.network.NetworkThread.ChatChannelId, new Network.NetworkMessage(packet, NetworkMessageEnum.VoiceChatMessage)));
             VoiceChatPacketReceived?.Invoke(packet);
         }
 
